@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: frontend-container
-          image: we08arc.azurecr.io/frontend:latest
+          image: we08acr.azurecr.io/frontend:latest # This will be patched by kubectl set image in the workflow
           imagePullPolicy: Always
           ports:
             - containerPort: 80

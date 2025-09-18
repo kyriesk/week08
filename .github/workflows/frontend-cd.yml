@@ -8,21 +8,25 @@ on:
   workflow_dispatch:
     inputs:
       product_api_ip:
-        description: 'External IP of Product Service'
+        description: "External IP of Product Service"
         required: true
-        default: 'http://<ip_address>:8000'
+        default: "http://<ip_address>:8000"
       order_api_ip:
-        description: 'External IP of Order Service (e.g., http://Y.Y.Y.Y:8001)'
+        description: "External IP of Order Service (e.g., http://Y.Y.Y.Y:8001)"
         required: true
-        default: 'http://<ip_address>:8001'
+        default: "http://<ip_address>:8001"
       aks_cluster_name:
-        description: 'Name of the AKS Cluster to deploy to'
+        description: "Name of the AKS Cluster to deploy to"
         required: true
-        default: '<aks_name>'
+        default: "<aks_name>"
       aks_resource_group:
-        description: 'Resource Group of the AKS Cluster'
+        description: "Resource Group of the AKS Cluster"
         required: true
-        default: '<<resource_group_name>'
+        default: "<<resource_group_name>"
+      image_tag:
+        description: "Image tag for frontend Docker image"
+        required: true
+        default: "latest"
 
   workflow_call:
     inputs:
@@ -38,11 +42,17 @@ on:
       aks_resource_group:
         required: true
         type: string
+      image_tag:
+        required: true
+        type: string
 
 jobs:
   deploy_frontend:
     runs-on: ubuntu-latest
-    environment: Production
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    # Add manual approval for production
 
     steps:
       - name: Checkout repository
@@ -64,17 +74,17 @@ jobs:
           # Ensure frontend/main.js is directly in the path for sed
           sed -i "s|_PRODUCT_API_URL_|${{ inputs.product_api_ip }}|g" frontend/main.js
           sed -i "s|_ORDER_API_URL_|${{ inputs.order_api_ip }}|g" frontend/main.js
-          
+
           # Display the modified file content for debugging
           echo "--- Modified main.js content ---"
           cat frontend/main.js
           echo "---------------------------------"
 
       # Build and Push Docker image for Frontend
-      - name: Build and Push Frontend Image
+      - name: Build and Push Frontend Image (tagged)
         run: |
-          docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:latest ./frontend/
-          docker push ${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:latest
+          docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:${{ inputs.image_tag }} ./frontend/
+          docker push ${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:${{ inputs.image_tag }}
 
       - name: Set Kubernetes context (get AKS credentials)
         uses: azure/aks-set-context@v3
@@ -84,10 +94,17 @@ jobs:
 
       - name: Deploy Frontend to AKS
         run: |
-          echo "Deploying frontend with latest tag to AKS cluster: ${{ inputs.aks_cluster_name }}"
+          echo "Deploying frontend with tag ${{ inputs.image_tag }} to AKS cluster: ${{ inputs.aks_cluster_name }}"
           cd k8s/
-          # Ensure frontend-service.yaml is configured with your ACR
+          # Patch the deployment to use the new image tag
+          kubectl set image deployment/frontend frontend-container=${{ secrets.AZURE_CONTAINER_REGISTRY }}/frontend:${{ inputs.image_tag }}
           kubectl apply -f frontend.yaml
+      - name: Check rollout status
+        run: kubectl rollout status deployment/frontend
+
+      - name: Rollback if failed
+        if: failure()
+        run: kubectl rollout undo deployment/frontend
 
       - name: Logout from Azure (AKS deployment)
         run: az logout

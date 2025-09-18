@@ -2,28 +2,33 @@
 
 name: Backend CI - Test, Build and Push Images to ACR
 
-# Trigger the workflow on pushes to the 'main' branch
-# You can also add 'pull_request:' to run on PRs
+# Triggers: main, development, feature branches, and PRs
 on:
-  # Manual trigger
   workflow_dispatch:
-
-  # Automatically on pushes to main branch
   push:
     branches:
       - main
-    paths: # Only trigger if changes are in backend directories
+      - development
+      - "feature/**"
+    paths:
       - "backend/**"
-      - ".github/workflows/backend_ci.yml" # Trigger if this workflow file changes
+      - ".github/workflows/backend_ci.yml"
+  pull_request:
+    branches:
+      - main
+      - development
+      - "feature/**"
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend_ci.yml"
 
 # Define global environment variables that can be used across jobs
 env:
   # ACR Login Server (e.g., myregistry.azurecr.io)
   # This needs to be set as a GitHub Repository Secret
   ACR_LOGIN_SERVER: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-  # Dynamically generate image tags based on Git SHA and GitHub Run ID
-  # This provides unique, traceable tags for each image build
-  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
+  # Use commit SHA as unique image tag for traceability
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   # Job 1: Run tests and linting for all backend services
@@ -128,17 +133,17 @@ jobs:
       - name: Login to Azure Container Registry
         run: az acr login --name ${{ env.ACR_LOGIN_SERVER }}
 
-      # Build and Push Docker image for Product Service
+      # Build and Push Docker image for Product Service (tagged with commit SHA)
       - name: Build and Push Product Service Image
         run: |
-          docker build -t ${{ env.ACR_LOGIN_SERVER }}/product_service:latest ./backend/product_service/
-          docker push ${{ env.ACR_LOGIN_SERVER }}/product_service:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/product_service:${{ env.IMAGE_TAG }} ./backend/product_service/
+          docker push ${{ env.ACR_LOGIN_SERVER }}/product_service:${{ env.IMAGE_TAG }}
 
-      # Build and Push Docker image for Order Service
+      # Build and Push Docker image for Order Service (tagged with commit SHA)
       - name: Build and Push Order Service Image
         run: |
-          docker build -t ${{ env.ACR_LOGIN_SERVER }}/order_service:latest ./backend/order_service/
-          docker push ${{ env.ACR_LOGIN_SERVER }}/order_service:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/order_service:${{ env.IMAGE_TAG }} ./backend/order_service/
+          docker push ${{ env.ACR_LOGIN_SERVER }}/order_service:${{ env.IMAGE_TAG }}
 
       # Logout from Azure for security (runs even if image push fails)
       - name: Logout from Azure

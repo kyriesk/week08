@@ -4,26 +4,36 @@ on:
   workflow_dispatch:
     inputs:
       aks_cluster_name:
-        description: 'Name of the AKS Cluster to deploy to'
+        description: "Name of the AKS Cluster to deploy to"
         required: true
-        default: '<aks_cluster_name>'
+        default: "<aks_cluster_name>"
       aks_resource_group:
-        description: 'Resource Group of the AKS Cluster'
+        description: "Resource Group of the AKS Cluster"
         required: true
-        default: '<resource_group_name>'
+        default: "<resource_group_name>"
       aks_acr_name:
-        description: 'Name of ACR'
+        description: "Name of ACR"
         required: true
-        default: '<acr_name>'
+        default: "<acr_name>"
+      product_image_tag:
+        description: "Product Service image tag"
+        required: true
+        default: "latest"
+      order_image_tag:
+        description: "Order Service image tag"
+        required: true
+        default: "latest"
 
 jobs:
   deploy_backend:
     runs-on: ubuntu-latest
-    environment: Production
-    
+    environment:
+      name: production
     outputs:
       PRODUCT_API_IP: ${{ steps.get_product_ip.outputs.external_ip }}
       ORDER_API_IP: ${{ steps.get_order_ip.outputs.external_ip }}
+      PRODUCT_IMAGE_TAG: ${{ github.event.inputs.product_image_tag }}
+      ORDER_IMAGE_TAG: ${{ github.event.inputs.order_image_tag }}
 
     steps:
       - name: Checkout repository
@@ -54,17 +64,33 @@ jobs:
 
       - name: Deploy Backend Microservices (Product, Order)
         run: |
-          echo "Deploying backend microservices..."
+          echo "Deploying backend microservices with image tags..."
           cd k8s/
+          kubectl set image deployment/product-service product-service-container=${{ github.event.inputs.aks_acr_name }}/product_service:${{ github.event.inputs.product_image_tag }}
+          kubectl set image deployment/order-service order-service-container=${{ github.event.inputs.aks_acr_name }}/order_service:${{ github.event.inputs.order_image_tag }}
           kubectl apply -f product-service.yaml
           kubectl apply -f order-service.yaml
-      
+
+      - name: Check rollout status (Product)
+        run: kubectl rollout status deployment/product-service
+
+      - name: Check rollout status (Order)
+        run: kubectl rollout status deployment/order-service
+
+      - name: Rollback Product if failed
+        if: failure()
+        run: kubectl rollout undo deployment/product-service
+
+      - name: Rollback Order if failed
+        if: failure()
+        run: kubectl rollout undo deployment/order-service
+
       - name: Wait for Backend LoadBalancer IPs
         run: |
           echo "Waiting for Product, Order LoadBalancer IPs to be assigned (up to 5 minutes)..."
           PRODUCT_IP=""
           ORDER_IP=""
-          
+
           for i in $(seq 1 60); do
             echo "Attempt $i/60 to get IPs..."
             PRODUCT_IP=$(kubectl get service product-service-w08e1 -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -78,12 +104,12 @@ jobs:
             fi
             sleep 5 # Wait 5 seconds before next attempt
           done
-          
+
           if [[ -z "$PRODUCT_IP" || -z "$ORDER_IP" ]]; then
             echo "Error: One or more LoadBalancer IPs not assigned after timeout."
             exit 1 # Fail the job if IPs are not obtained
           fi
-          
+
           # These are environment variables for subsequent steps in the *same job*
           # And used to set the job outputs
           echo "PRODUCT_IP=$PRODUCT_IP" >> $GITHUB_ENV
@@ -92,7 +118,7 @@ jobs:
       - name: Capture Product Service IP for Workflow Output
         id: get_product_ip
         run: echo "external_ip=${{ env.PRODUCT_IP }}" >> $GITHUB_OUTPUT
-      
+
       - name: Capture Order Service IP for Workflow Output
         id: get_order_ip
         run: echo "external_ip=${{ env.ORDER_IP }}" >> $GITHUB_OUTPUT
