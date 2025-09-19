@@ -66,24 +66,24 @@ jobs:
         run: |
           echo "Deploying backend microservices with image tags..."
           cd k8s/
-          kubectl set image deployment/product-service product-service-container=${{ github.event.inputs.aks_acr_name }}/product_service:${{ github.event.inputs.product_image_tag }}
-          kubectl set image deployment/order-service order-service-container=${{ github.event.inputs.aks_acr_name }}/order_service:${{ github.event.inputs.order_image_tag }}
+          kubectl set image deployment/product-service-w08e1 product-service-container=${{ github.event.inputs.aks_acr_name }}/product_service:${{ github.event.inputs.product_image_tag }}
+          kubectl set image deployment/order-service-w08e1 order-service-container=${{ github.event.inputs.aks_acr_name }}/order_service:${{ github.event.inputs.order_image_tag }}
           kubectl apply -f product-service.yaml
           kubectl apply -f order-service.yaml
 
       - name: Check rollout status (Product)
-        run: kubectl rollout status deployment/product-service
+        run: kubectl rollout status deployment/product-service-w08e1
 
       - name: Check rollout status (Order)
-        run: kubectl rollout status deployment/order-service
+        run: kubectl rollout status deployment/order-service-w08e1
 
       - name: Rollback Product if failed
         if: failure()
-        run: kubectl rollout undo deployment/product-service
+        run: kubectl rollout undo deployment/product-service-w08e1
 
       - name: Rollback Order if failed
         if: failure()
-        run: kubectl rollout undo deployment/order-service
+        run: kubectl rollout undo deployment/order-service-w08e1
 
       - name: Wait for Backend LoadBalancer IPs
         run: |
