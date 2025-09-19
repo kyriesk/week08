@@ -136,14 +136,14 @@ jobs:
       # Build and Push Docker image for Product Service (tagged with commit SHA)
       - name: Build and Push Product Service Image
         run: |
-          docker build -t ${{ env.ACR_LOGIN_SERVER }}/product_service:latest ./backend/product_service/
-          docker push ${{ env.ACR_LOGIN_SERVER }}/product_service:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/product-service:latest ./backend/product_service/
+          docker push ${{ env.ACR_LOGIN_SERVER }}/product-service:latest
 
       # Build and Push Docker image for Order Service (tagged with commit SHA)
       - name: Build and Push Order Service Image
         run: |
-          docker build -t ${{ env.ACR_LOGIN_SERVER }}/order_service:latest ./backend/order_service/
-          docker push ${{ env.ACR_LOGIN_SERVER }}/order_service:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/order-service:latest ./backend/order_service/
+          docker push ${{ env.ACR_LOGIN_SERVER }}/order-service:latest
 
       # Logout from Azure for security (runs even if image push fails)
       - name: Logout from Azure
