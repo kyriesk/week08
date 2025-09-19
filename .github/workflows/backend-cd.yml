@@ -51,7 +51,7 @@ jobs:
 
       - name: Attach ACR
         run: |
-          az aks update --name ${{ github.event.inputs.aks_cluster_name }} --resource-group ${{ github.event.inputs.aks_resource_group }} --attach-acr ${{ github.event.inputs.aks_acr_name }}
+          az aks update --name ${{ github.event.inputs.aks_cluster_name }} --resource-group ${{ github.event.inputs.aks_resource_group }} --attach-acr we08acr
 
       - name: Deploy Backend Infrastructure (Namespace, ConfigMaps, Secrets, Databases)
         run: |
@@ -66,8 +66,8 @@ jobs:
         run: |
           echo "Deploying backend microservices with image tags..."
           cd k8s/
-          kubectl set image deployment/product-service-w08e1 product-service-container=${{ github.event.inputs.aks_acr_name }}/product_service:${{ github.event.inputs.product_image_tag }}
-          kubectl set image deployment/order-service-w08e1 order-service-container=${{ github.event.inputs.aks_acr_name }}/order_service:${{ github.event.inputs.order_image_tag }}
+          kubectl set image deployment/product-service-w08e1 product-service-container=${{ github.event.inputs.aks_acr_name }}/product-service:${{ github.event.inputs.product_image_tag }}
+          kubectl set image deployment/order-service-w08e1 order-service-container=${{ github.event.inputs.aks_acr_name }}/order-service:${{ github.event.inputs.order_image_tag }}
           kubectl apply -f product-service.yaml
           kubectl apply -f order-service.yaml
 
